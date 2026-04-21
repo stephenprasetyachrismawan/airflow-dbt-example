@@ -1,0 +1,41 @@
+MED_ID,MED_NAME,TYPE_CD,TYPE_DES,FORM_CD,FORM_DES,STRN_NO,STRN_UN,COST_UN,MSTAT_CD,MSTAT_DES
+MED00001,Ad Facere,ANT,Antibiotic,TAB,Tablet,STR-328986,mcg,74656,AVL,Available
+MED00002,Culpa Illo,PAI,Painkiller,CAP,Capsule,STR-341036,mg,48254,OOS,Out of Stock
+MED00003,Tempore Soluta,VIT,Vitamin,INJ,Injection,STR-711798,IU,86981,AVL,Available
+MED00004,Ad Suscipit,HYP,Hypertension,LIQ,Liquid,STR-893246,ml,31306,OOS,Out of Stock
+MED00005,A Sint,DIA,Diabetes,TAB,Tablet,STR-539621,IU,47843,AVL,Available
+MED00006,Qui Magni,AST,Asthma,CAP,Capsule,STR-188888,mcg,97601,OOS,Out of Stock
+MED00007,Adipisci Molestias,ANT,Antibiotic,INJ,Injection,STR-706540,mcg,17371,AVL,Available
+MED00008,Magnam Atque,PAI,Painkiller,LIQ,Liquid,STR-531952,mcg,3049,OOS,Out of Stock
+MED00009,Aperiam Libero,VIT,Vitamin,TAB,Tablet,STR-852772,mg,21932,AVL,Available
+MED00010,Deleniti At,HYP,Hypertension,CAP,Capsule,STR-704303,mg,30855,OOS,Out of Stock
+MED00011,Animi Ipsam,DIA,Diabetes,INJ,Injection,STR-486874,IU,73694,AVL,Available
+MED00012,Amet Tenetur,AST,Asthma,LIQ,Liquid,STR-345054,mg,8400,OOS,Out of Stock
+MED00013,Cupiditate Maxime,ANT,Antibiotic,TAB,Tablet,STR-667652,IU,43642,AVL,Available
+MED00014,Praesentium Voluptate,PAI,Painkiller,CAP,Capsule,STR-758416,mcg,52407,OOS,Out of Stock
+MED00015,Beatae Non,VIT,Vitamin,INJ,Injection,STR-928451,IU,5499,AVL,Available
+MED00016,Beatae Itaque,HYP,Hypertension,LIQ,Liquid,STR-447962,mcg,60040,OOS,Out of Stock
+MED00017,Voluptas Numquam,DIA,Diabetes,TAB,Tablet,STR-570596,mcg,30299,AVL,Available
+MED00018,Harum Tempore,AST,Asthma,CAP,Capsule,STR-016582,IU,33711,OOS,Out of Stock
+MED00019,Aliquam Dicta,ANT,Antibiotic,INJ,Injection,STR-970213,mcg,54351,AVL,Available
+MED00020,Tenetur Maiores,PAI,Painkiller,LIQ,Liquid,STR-569092,mcg,49354,OOS,Out of Stock
+MED00021,Veritatis Odio,VIT,Vitamin,TAB,Tablet,STR-557192,mcg,3557,AVL,Available
+MED00022,Quia Maiores,HYP,Hypertension,CAP,Capsule,STR-654310,mg,83018,OOS,Out of Stock
+MED00023,Ea Praesentium,DIA,Diabetes,INJ,Injection,STR-868144,mg,69497,AVL,Available
+MED00024,Voluptatibus Occaecati,AST,Asthma,LIQ,Liquid,STR-394731,mcg,22357,OOS,Out of Stock
+MED00025,Deleniti Aut,ANT,Antibiotic,TAB,Tablet,STR-727155,ml,78505,AVL,Available
+MED00026,Voluptatum At,PAI,Painkiller,CAP,Capsule,STR-884422,ml,62135,OOS,Out of Stock
+MED00027,Magni Quaerat,VIT,Vitamin,INJ,Injection,STR-313237,mg,95179,AVL,Available
+MED00028,Alias Magni,HYP,Hypertension,LIQ,Liquid,STR-895782,mg,39467,OOS,Out of Stock
+MED00029,Similique Commodi,DIA,Diabetes,TAB,Tablet,STR-146786,mg,92412,AVL,Available
+MED00030,Nemo Repellat,AST,Asthma,CAP,Capsule,STR-125177,mcg,4987,OOS,Out of Stock
+MED00031,Vero Quas,ANT,Antibiotic,INJ,Injection,STR-528922,mcg,23399,AVL,Available
+MED00032,Non Provident,PAI,Painkiller,LIQ,Liquid,STR-018242,mcg,47214,OOS,Out of Stock
+MED00033,Dolorem Iste,VIT,Vitamin,TAB,Tablet,STR-358414,IU,87416,AVL,Available
+MED00034,Eius Tempora,HYP,Hypertension,CAP,Capsule,STR-842498,mcg,45064,OOS,Out of Stock
+MED00035,Consectetur Provident,DIA,Diabetes,INJ,Injection,STR-299229,mcg,71091,AVL,Available
+MED00036,Sed Labore,AST,Asthma,LIQ,Liquid,STR-900109,IU,41818,OOS,Out of Stock
+MED00037,Fuga Totam,ANT,Antibiotic,TAB,Tablet,STR-396907,ml,20830,AVL,Available
+MED00038,Sunt Quisquam,PAI,Painkiller,CAP,Capsule,STR-447364,ml,7893,OOS,Out of Stock
+MED00039,Odit Aut,VIT,Vitamin,INJ,Injection,STR-027677,ml,80909,AVL,Available
+MED00040,Enim Laboriosam,HYP,Hypertension,LIQ,Liquid,STR-925556,ml,4436,OOS,Out of Stock

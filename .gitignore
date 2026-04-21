@@ -1,0 +1,45 @@
+# dbt
+target/
+dbt_packages/
+logs/
+.dbt/
+
+# DuckDB
+*.duckdb
+*.duckdb.wal
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Airflow
+airflow.db
+airflow-webserver.pid
+airflow-scheduler.pid
+
+# Documentation
+docs/generated/

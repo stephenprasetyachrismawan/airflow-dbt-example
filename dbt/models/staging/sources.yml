@@ -1,0 +1,114 @@
+version: 2
+
+sources:
+  - name: healthcare_raw
+    description: "Raw healthcare data from CSV ingestion"
+    schema: raw
+    tables:
+      - name: stg_ehp__patn
+        description: "Patient master data"
+        columns:
+          - name: PAT_ID
+            description: "Unique patient identifier"
+            tests:
+              - unique
+              - not_null
+
+      - name: stg_ehp__dpmt
+        description: "Department master data"
+        columns:
+          - name: DEP_ID
+            description: "Unique department identifier"
+            tests:
+              - unique
+              - not_null
+
+      - name: stg_ehp__stff
+        description: "Staff master data"
+        columns:
+          - name: STF_ID
+            description: "Unique staff identifier"
+            tests:
+              - unique
+              - not_null
+
+      - name: stg_ehp__roms
+        description: "Room master data"
+        columns:
+          - name: ROM_ID
+            description: "Unique room identifier"
+            tests:
+              - unique
+              - not_null
+
+      - name: stg_ehp__mdcn
+        description: "Medicine/Drug master data"
+        columns:
+          - name: MED_ID
+            description: "Unique medicine identifier"
+            tests:
+              - unique
+              - not_null
+
+      - name: stg_ehp__algy
+        description: "Allergy master data"
+        columns:
+          - name: ALG_ID
+            description: "Unique allergy identifier"
+            tests:
+              - unique
+              - not_null
+
+      - name: stg_ehp__insr
+        description: "Insurance policy data"
+        columns:
+          - name: POL_NO
+            description: "Unique policy number"
+            tests:
+              - unique
+              - not_null
+
+      - name: stg_ehp__ptal
+        description: "Patient allergy mapping"
+
+      - name: stg_ehp__medt
+        description: "Medical team composition"
+        columns:
+          - name: MEDT_ID
+            description: "Unique medical team identifier"
+            tests:
+              - unique
+              - not_null
+
+      - name: stg_ehp__vist
+        description: "Patient visit records"
+        columns:
+          - name: REFR_NO
+            description: "Unique visit/referral reference number"
+            tests:
+              - unique
+              - not_null
+
+      - name: stg_ehp__diag
+        description: "Diagnosis records"
+
+      - name: stg_ehp__trtm
+        description: "Treatment records"
+
+      - name: stg_ehp__tmmd
+        description: "Treatment medicine administration"
+
+      - name: stg_ehp__bill
+        description: "Billing records"
+
+      - name: stg_ehp__mdbl
+        description: "Medical billing (doctor fees)"
+
+      - name: stg_ehp__pmnt
+        description: "Payment records"
+        columns:
+          - name: PMNT_NO
+            description: "Unique payment number"
+            tests:
+              - unique
+              - not_null

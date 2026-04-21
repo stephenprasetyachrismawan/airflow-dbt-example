@@ -1,0 +1,9 @@
+healthcare:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: '/opt/airflow/duckdb/healthcare.duckdb'
+      schema: analytics
+      threads: 4
+      timeout_seconds: 300
