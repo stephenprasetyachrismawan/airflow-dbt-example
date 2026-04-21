@@ -13,27 +13,27 @@ Set-Location $scriptDir
 Write-Host "Current directory: $scriptDir" -ForegroundColor Yellow
 Write-Host ""
 
-# STEP 1: Check if CSV files exist
+# STEP 1: Check Kaggle environment and archive directory
 Write-Host "===============================================================================" -ForegroundColor Green
-Write-Host "STEP 1: Checking CSV files..." -ForegroundColor Green
+Write-Host "STEP 1: Checking Kaggle configuration..." -ForegroundColor Green
 Write-Host "===============================================================================" -ForegroundColor Green
 
-$csvCount = (Get-ChildItem "data/raw/*.csv" -ErrorAction SilentlyContinue).Count
-if ($csvCount -eq 16) {
-    Write-Host "OK - All 16 CSV files found in data/raw/" -ForegroundColor Green
+$archiveDir = "data/archive/STG_EHP_DATASET"
+if (-not (Test-Path $archiveDir)) {
+    New-Item -ItemType Directory -Path $archiveDir -Force | Out-Null
+    Write-Host "Created archive directory: $archiveDir" -ForegroundColor Yellow
+}
+
+if ([string]::IsNullOrWhiteSpace($env:KAGGLE_USERNAME) -or [string]::IsNullOrWhiteSpace($env:KAGGLE_KEY)) {
+    Write-Host "WARNING - KAGGLE_USERNAME / KAGGLE_KEY belum di-set." -ForegroundColor Yellow
+    Write-Host "Pipeline tetap bisa jalan jika file archive sudah ada lokal." -ForegroundColor Yellow
 } else {
-    Write-Host "WARNING - Only $csvCount CSV files found (expected 16)" -ForegroundColor Yellow
-    Write-Host "Running dummy data generator..." -ForegroundColor Yellow
-    python generate_dummy_data.py
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERROR: Failed to generate dummy data" -ForegroundColor Red
-        exit 1
-    }
+    Write-Host "OK - Kaggle credentials terdeteksi" -ForegroundColor Green
 }
 
 Write-Host ""
-Write-Host "CSV Files:" -ForegroundColor Cyan
-Get-ChildItem "data/raw/*.csv" | ForEach-Object {
+Write-Host "Archive Files (if any):" -ForegroundColor Cyan
+Get-ChildItem "$archiveDir/**/*.csv" -ErrorAction SilentlyContinue | ForEach-Object {
     $size = [math]::Round($_.Length / 1KB, 2)
     Write-Host "  - $($_.Name) ($size KB)" -ForegroundColor Green
 }

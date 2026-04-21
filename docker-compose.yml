@@ -11,11 +11,14 @@ x-airflow-common: &airflow-common
     AIRFLOW__WEBSERVER__SECRET_KEY: "healthcare_secret_key_2024"
     AIRFLOW_HOME: /opt/airflow
     PYTHONPATH: /opt/airflow
+    KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
+    KAGGLE_KEY: ${KAGGLE_KEY:-}
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./dbt:/opt/airflow/dbt
     - ./data:/opt/airflow/data
     - ./duckdb:/opt/airflow/duckdb
+    - ./scripts:/opt/airflow/scripts
     - airflow_logs:/opt/airflow/logs
   networks:
     - healthcare_network
@@ -49,7 +52,7 @@ services:
     <<: *airflow-common
     container_name: healthcare_airflow_init
     entrypoint: bash -c "
-      pip install duckdb dbt-duckdb pandas faker --quiet &&
+      pip install duckdb dbt-duckdb pandas faker kagglehub --quiet &&
       airflow db init &&
       airflow users create
       --username admin
@@ -72,7 +75,7 @@ services:
         condition: service_completed_successfully
     ports:
       - "8080:8080"
-    entrypoint: bash -c "pip install duckdb dbt-duckdb pandas faker --quiet && airflow webserver"
+    entrypoint: bash -c "pip install duckdb dbt-duckdb pandas faker kagglehub --quiet && airflow webserver"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -88,7 +91,7 @@ services:
         condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
-    entrypoint: bash -c "pip install duckdb dbt-duckdb pandas faker --quiet && airflow scheduler"
+    entrypoint: bash -c "pip install duckdb dbt-duckdb pandas faker kagglehub --quiet && airflow scheduler"
 
   # dbt Docs Server
   dbt-docs:
@@ -99,7 +102,7 @@ services:
         condition: service_completed_successfully
     ports:
       - "8081:8081"
-    entrypoint: bash -c "pip install duckdb dbt-duckdb --quiet && cd /opt/airflow/dbt && /home/airflow/.local/bin/dbt docs serve --port 8081 --host 0.0.0.0 --profiles-dir ."
+    entrypoint: bash -c "pip install duckdb dbt-duckdb kagglehub --quiet && cd /opt/airflow/dbt && /home/airflow/.local/bin/dbt docs serve --port 8081 --host 0.0.0.0 --profiles-dir ."
     restart: unless-stopped
 
 volumes:
