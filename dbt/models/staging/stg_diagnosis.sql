@@ -1,37 +1,18 @@
-{{ config(
-    materialized='view',
-    schema='staging',
-    tags=['staging', 'diagnosis']
-) }}
+{{ config(materialized='view', schema='staging') }}
 
-with source as (
-    select
-        refr_no,
-        dig_tot,
-        dig_en,
-        dig_seq,
-        dig_cd,
-        dig_des,
-        dstat_cd,
-        dstat_des,
-        dtype_cd,
-        dtype_des,
-        rom_id,
-        current_timestamp as dw_load_date
-    from {{ source('healthcare_raw', 'stg_ehp__diag') }}
-)
-
+-- Sudah di-UNION ALL saat ingest ke raw.stg_ehp__diag
 select
-    refr_no,
-    dig_tot as total_diagnosis,
-    dig_en as diagnosis_entry_date,
-    dig_seq as diagnosis_sequence,
-    dig_cd as diagnosis_code,
-    dig_des as diagnosis_description,
-    dstat_cd as diagnosis_status_code,
-    dstat_des as diagnosis_status_description,
-    dtype_cd as diagnosis_type_code,
-    dtype_des as diagnosis_type_description,
-    rom_id,
-    dw_load_date
-from source
+    REFR_NO                             as refr_no,
+    DIG_SEQ                             as urutan_diagnosis,
+    DIG_CD                              as kode_diagnosis,
+    DIG_DES                             as deskripsi_diagnosis,
+    try_cast(DIG_EN as timestamp)       as waktu_diagnosis,
+    try_cast(DIG_EN as date)            as tanggal_diagnosis,
+    try_cast(DIG_TOT as decimal(15,2))  as total_biaya,
+    DSTAT_CD                            as kode_status,
+    DSTAT_DES                           as deskripsi_status,
+    DTYPE_CD                            as kode_tipe,
+    DTYPE_DES                           as deskripsi_tipe,
+    ROM_ID                              as rom_id
+from {{ source('raw_kaggle', 'stg_ehp__diag') }}
+where REFR_NO is not null
