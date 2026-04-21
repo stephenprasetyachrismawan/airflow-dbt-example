@@ -1,8 +1,7 @@
 """
 Healthcare Data Warehouse - Apache Airflow DAG
-Kaggle Dataset: moid1234/health-care-data-set-20-tables
+Kaggle Real Dataset: STG_EHP archive
 Stack: DuckDB + dbt + Airflow
-Ingestion: kagglehub KaggleDatasetAdapter.PANDAS (no local CSV required)
 """
 
 from datetime import datetime, timedelta
@@ -18,10 +17,10 @@ from airflow.utils.dates import days_ago
 # Configuration
 # ============================================================================
 AIRFLOW_HOME = os.getenv('AIRFLOW_HOME', '/opt/airflow')
+DATA_ARCHIVE_DIR = f'{AIRFLOW_HOME}/data/archive/STG_EHP_DATASET'
 DUCKDB_PATH = f'{AIRFLOW_HOME}/duckdb/healthcare.duckdb'
 DBT_DIR = f'{AIRFLOW_HOME}/dbt'
 DBT_BIN = '/home/airflow/.local/bin/dbt'
-KAGGLE_DATASET = 'moid1234/health-care-data-set-20-tables'
 
 # Tabel root level yang in-scope (9 tabel)
 REQUIRED_TABLES = [
@@ -56,7 +55,7 @@ default_args = {
 dag = DAG(
     dag_id='healthcare_pipeline_duckdb',
     default_args=default_args,
-    description='Healthcare DW ELT Pipeline — Kaggle KaggleDatasetAdapter.PANDAS',
+    description='Healthcare DW ELT Pipeline — Local Archive CSV',
     schedule_interval='0 1 * * *',
     start_date=days_ago(1),
     catchup=False,
@@ -64,89 +63,72 @@ dag = DAG(
 )
 
 # ============================================================================
-# TASK 1: Validate Kaggle Credentials
+# TASK 1: Validate Source Files
 # ============================================================================
-def validate_kaggle_credentials():
-    kaggle_username = os.getenv('KAGGLE_USERNAME', '').strip()
-    kaggle_key = os.getenv('KAGGLE_KEY', '').strip()
+def validate_source_files():
+    missing = []
 
-    if not kaggle_username or not kaggle_key:
-        raise RuntimeError(
-            'KAGGLE_USERNAME dan KAGGLE_KEY harus di-set sebagai environment variable. '
-            'Set di docker-compose.yml atau .env file.'
-        )
+    # Cek 9 tabel root level
+    for table_name in REQUIRED_TABLES:
+        csv_path = f'{DATA_ARCHIVE_DIR}/{table_name}.csv'
+        if not os.path.exists(csv_path):
+            missing.append(csv_path)
+        else:
+            size = os.path.getsize(csv_path)
+            print(f'  {table_name}.csv ({size:,} bytes)')
 
-    try:
-        import kagglehub  # noqa: F401
-    except ImportError as exc:
-        raise RuntimeError(
-            'kagglehub tidak terinstall. Pastikan container sudah install: pip install kagglehub'
-        ) from exc
+    # Cek 2 file DIAG di subfolder
+    for diag_rel in DIAG_FILES:
+        diag_path = f'{DATA_ARCHIVE_DIR}/{diag_rel}'
+        if not os.path.exists(diag_path):
+            missing.append(diag_path)
+        else:
+            size = os.path.getsize(diag_path)
+            print(f'  {diag_rel} ({size:,} bytes)')
 
-    print(f'Kaggle credentials valid: username={kaggle_username}')
-    print(f'Dataset target: {KAGGLE_DATASET}')
-    print(f'DuckDB path: {DUCKDB_PATH}')
-    os.makedirs(os.path.dirname(DUCKDB_PATH), exist_ok=True)
+    if missing:
+        raise FileNotFoundError(f'File tidak ditemukan: {missing}')
+
+    print(f'\nSemua {len(REQUIRED_TABLES) + len(DIAG_FILES)} file source tervalidasi.')
 
 
 task_validate = PythonOperator(
-    task_id='validate_kaggle_credentials',
-    python_callable=validate_kaggle_credentials,
+    task_id='validate_source_files',
+    python_callable=validate_source_files,
     dag=dag,
 )
 
 # ============================================================================
-# TASK 2: Ingest dari Kaggle langsung ke DuckDB via KaggleDatasetAdapter.PANDAS
+# TASK 2: Ingest CSV ke DuckDB (raw schema)
 # ============================================================================
-def ingest_from_kaggle_to_duckdb():
-    import kagglehub
-    from kagglehub import KaggleDatasetAdapter
-    import pandas as pd
-
+def ingest_csv_to_duckdb():
+    os.makedirs(os.path.dirname(DUCKDB_PATH), exist_ok=True)
     con = duckdb.connect(DUCKDB_PATH)
     try:
         con.execute("CREATE SCHEMA IF NOT EXISTS raw")
 
         # 1. Ingest 9 tabel root level
         for table_name in REQUIRED_TABLES:
-            # Path file di dalam dataset Kaggle
-            file_path = f'STG_EHP_DATASET/{table_name}.csv'
-            print(f'Loading {file_path} ...')
-
-            df = kagglehub.load_dataset(
-                KaggleDatasetAdapter.PANDAS,
-                KAGGLE_DATASET,
-                file_path,
-            )
-
+            csv_path = f'{DATA_ARCHIVE_DIR}/{table_name}.csv'
             tbl = table_name.lower()
             con.execute(f"DROP TABLE IF EXISTS raw.{tbl}")
-            con.register('_tmp_df', df)
-            con.execute(f"CREATE TABLE raw.{tbl} AS SELECT * FROM _tmp_df")
-            con.unregister('_tmp_df')
-
+            con.execute(f"""
+                CREATE TABLE raw.{tbl} AS
+                SELECT * FROM read_csv_auto('{csv_path}', ignore_errors=true)
+            """)
             cnt = con.execute(f"SELECT COUNT(*) FROM raw.{tbl}").fetchone()[0]
             print(f'  raw.{tbl}: {cnt:,} rows')
 
         # 2. Ingest DIAG: UNION ALL dari 2 file
-        print('Loading DIAG files (UNION ALL) ...')
-        diag_frames = []
-        for diag_rel in DIAG_FILES:
-            file_path = f'STG_EHP_DATASET/{diag_rel}'
-            print(f'  Loading {file_path} ...')
-            df = kagglehub.load_dataset(
-                KaggleDatasetAdapter.PANDAS,
-                KAGGLE_DATASET,
-                file_path,
-            )
-            diag_frames.append(df)
-
-        diag_df = pd.concat(diag_frames, ignore_index=True)
+        diag1 = f'{DATA_ARCHIVE_DIR}/STG_EHP__DIAG/STG_EHP__DIAG_1.csv'
+        diag2 = f'{DATA_ARCHIVE_DIR}/STG_EHP__DIAG/STG_EHP__DIAG_2.csv'
         con.execute("DROP TABLE IF EXISTS raw.stg_ehp__diag")
-        con.register('_tmp_df', diag_df)
-        con.execute("CREATE TABLE raw.stg_ehp__diag AS SELECT * FROM _tmp_df")
-        con.unregister('_tmp_df')
-
+        con.execute(f"""
+            CREATE TABLE raw.stg_ehp__diag AS
+            SELECT * FROM read_csv_auto('{diag1}', ignore_errors=true)
+            UNION ALL
+            SELECT * FROM read_csv_auto('{diag2}', ignore_errors=true)
+        """)
         cnt = con.execute("SELECT COUNT(*) FROM raw.stg_ehp__diag").fetchone()[0]
         print(f'  raw.stg_ehp__diag (UNION ALL): {cnt:,} rows')
 
@@ -156,10 +138,9 @@ def ingest_from_kaggle_to_duckdb():
 
 
 task_ingest = PythonOperator(
-    task_id='ingest_from_kaggle_to_duckdb',
-    python_callable=ingest_from_kaggle_to_duckdb,
+    task_id='ingest_csv_to_duckdb',
+    python_callable=ingest_csv_to_duckdb,
     dag=dag,
-    execution_timeout=timedelta(minutes=30),
 )
 
 # ============================================================================
