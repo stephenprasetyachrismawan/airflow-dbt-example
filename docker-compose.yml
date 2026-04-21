@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 
 x-airflow-common: &airflow-common
   image: apache/airflow:2.8.0-python3.10
@@ -6,9 +6,9 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG: 1
-    AIRFLOW__WEBSERVER__SECRET_KEY: 'healthcare_secret_key_2024'
+    AIRFLOW__WEBSERVER__SECRET_KEY: "healthcare_secret_key_2024"
     AIRFLOW_HOME: /opt/airflow
     PYTHONPATH: /opt/airflow
   volumes:
@@ -52,12 +52,12 @@ services:
       pip install duckdb dbt-duckdb pandas faker --quiet &&
       airflow db init &&
       airflow users create
-        --username admin
-        --password admin
-        --firstname Admin
-        --lastname User
-        --role Admin
-        --email admin@healthcare.local
+      --username admin
+      --password admin
+      --firstname Admin
+      --lastname User
+      --role Admin
+      --email admin@healthcare.local
       "
     restart: "no"
 
