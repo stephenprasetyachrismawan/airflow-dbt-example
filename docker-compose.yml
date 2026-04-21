@@ -90,6 +90,18 @@ services:
         condition: service_completed_successfully
     entrypoint: bash -c "pip install duckdb dbt-duckdb pandas faker --quiet && airflow scheduler"
 
+  # dbt Docs Server
+  dbt-docs:
+    <<: *airflow-common
+    container_name: healthcare_dbt_docs
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "8081:8081"
+    entrypoint: bash -c "pip install duckdb dbt-duckdb --quiet && cd /opt/airflow/dbt && /home/airflow/.local/bin/dbt docs serve --port 8081 --host 0.0.0.0 --profiles-dir ."
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   airflow_logs:
