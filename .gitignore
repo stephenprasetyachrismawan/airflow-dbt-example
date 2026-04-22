@@ -36,6 +36,11 @@ build/
 .Trashes
 ehthumbs.db
 
+# Dataset files (terlalu besar untuk git)
+data/archive/
+data/archive.zip
+data/*.zip
+
 # Airflow
 airflow.db
 airflow-webserver.pid

@@ -105,9 +105,33 @@ services:
     entrypoint: bash -c "pip install duckdb dbt-duckdb kagglehub --quiet && cd /opt/airflow/dbt && /home/airflow/.local/bin/dbt docs serve --port 8081 --host 0.0.0.0 --profiles-dir ."
     restart: unless-stopped
 
+  # Apache Superset - BI & Visualization Tool
+  superset:
+    image: apache/superset:4.0.2
+    container_name: healthcare_superset
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_SECRET_KEY: "healthcare_superset_secret_2026"
+    volumes:
+      - ./duckdb:/opt/airflow/duckdb
+      - superset_home:/app/superset_home
+    networks:
+      - healthcare_network
+    command: >
+      bash -c "
+        pip install duckdb-engine==0.13.3 --quiet &&
+        superset db upgrade &&
+        superset fab create-admin --username admin --firstname Admin --lastname User --email admin@healthcare.local --password admin 2>/dev/null || true &&
+        superset init &&
+        superset run -h 0.0.0.0 -p 8088 --with-threads
+      "
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   airflow_logs:
+  superset_home:
 
 networks:
   healthcare_network:
