@@ -1,156 +1,128 @@
 version: 2
 
 models:
-  - name: dim_date
-    description: "Date dimension table containing calendar information"
+  - name: dim_tanggal
+    description: "Dimensi tanggal kalender 2020-2027 — SCD Type 0"
     columns:
-      - name: date_key
-        description: "Surrogate key for date dimension"
-        tests:
-          - unique
-          - not_null
-      - name: calendar_date
-        description: "Actual date"
-        tests:
-          - unique
-          - not_null
+      - name: tanggal_key
+        tests: [unique, not_null]
+      - name: tanggal
+        tests: [unique]
 
-  - name: dim_patient
-    description: "Patient dimension table"
+  - name: dim_pasien
+    description: "Dimensi pasien dengan SCD Type 2"
     columns:
-      - name: patient_key
-        description: "Surrogate key for patient"
-        tests:
-          - unique
-          - not_null
+      - name: pasien_key
+        tests: [unique, not_null]
       - name: pat_id
-        description: "Natural key - patient ID"
-        tests:
-          - unique
-          - not_null
-      - name: full_name
-        description: "Patient full name"
-      - name: gender
-        description: "Patient gender"
-      - name: blood_type
-        description: "Patient blood type"
+        tests: [not_null]
 
-  - name: dim_doctor
-    description: "Doctor dimension table"
+  - name: dim_dokter
+    description: "Dimensi dokter (filter ROLE_DES=Doctor) — SCD Type 2"
     columns:
-      - name: doctor_key
-        description: "Surrogate key for doctor"
-        tests:
-          - unique
-          - not_null
-      - name: doctor_id
-        description: "Natural key - doctor/staff ID"
-        tests:
-          - unique
-          - not_null
-      - name: full_name
-        description: "Doctor full name"
-      - name: department_id
-        description: "Department ID"
+      - name: dokter_key
+        tests: [unique, not_null]
+      - name: stf_id
+        tests: [not_null]
 
-  - name: dim_room
-    description: "Hospital room dimension table"
+  - name: dim_departemen
+    description: "Dimensi departemen — SCD Type 1"
     columns:
-      - name: room_key
-        description: "Surrogate key for room"
-        tests:
-          - unique
-          - not_null
-      - name: room_id
-        description: "Natural key - room ID"
-        tests:
-          - unique
-          - not_null
-      - name: room_type_description
-        description: "Type of room (Standard, Premium, ICU)"
-      - name: room_capacity
-        description: "Room capacity number"
+      - name: departemen_key
+        tests: [unique, not_null]
+      - name: dep_id
+        tests: [unique, not_null]
+      - name: nama_departemen
+        tests: [not_null]
 
-  - name: dim_department
-    description: "Hospital department dimension table"
+  - name: dim_ruangan
+    description: "Dimensi ruangan — SCD Type 1"
     columns:
-      - name: department_key
-        description: "Surrogate key for department"
-        tests:
-          - unique
-          - not_null
-      - name: department_id
-        description: "Natural key - department ID"
-        tests:
-          - unique
-          - not_null
-      - name: department_name
-        description: "Department name"
-        tests:
-          - not_null
+      - name: ruangan_key
+        tests: [unique, not_null]
+      - name: rom_id
+        tests: [unique, not_null]
 
-  - name: fct_visit
-    description: "Fact table for patient visits"
+  - name: fct_kunjungan
+    description: "Fact table kunjungan pasien — grain: 1 baris per kunjungan"
     columns:
-      - name: visit_key
-        description: "Surrogate key for visit"
+      - name: kunjungan_key
+        tests: [unique, not_null]
+      - name: refr_no
+        tests: [not_null]
+      - name: pasien_key
         tests:
-          - unique
           - not_null
-      - name: visit_id
-        description: "Natural key - referral/visit number"
-        tests:
-          - unique
-          - not_null
-      - name: patient_key
-        description: "Foreign key to dim_patient"
-        tests:
           - relationships:
-              to: ref('dim_patient')
-              field: patient_key
-      - name: doctor_key
-        description: "Foreign key to dim_doctor"
-      - name: room_key
-        description: "Foreign key to dim_room"
-      - name: department_key
-        description: "Foreign key to dim_department"
-      - name: visit_date_key
-        description: "Foreign key to dim_date"
-      - name: length_of_stay_hours
-        description: "Length of stay in hours"
-      - name: is_inpatient
-        description: "Flag indicating if inpatient visit"
-      - name: visit_status_description
-        description: "Status of visit (Completed, Ongoing, Cancelled)"
-
-  - name: fct_billing
-    description: "Fact table for billing and payments"
-    columns:
-      - name: billing_key
-        description: "Surrogate key for billing"
+              to: ref('dim_pasien')
+              field: pasien_key
+      - name: dokter_key
         tests:
-          - unique
           - not_null
-      - name: billing_id
-        description: "Natural key - referral/billing number"
-        tests:
-          - unique
-          - not_null
-      - name: patient_key
-        description: "Foreign key to dim_patient"
-        tests:
           - relationships:
-              to: ref('dim_patient')
-              field: patient_key
-      - name: billing_date_key
-        description: "Foreign key to dim_date"
-      - name: billing_amount
-        description: "Total billing amount in IDR"
+              to: ref('dim_dokter')
+              field: dokter_key
+      - name: ruangan_key
         tests:
           - not_null
-      - name: payment_amount
-        description: "Total payment amount in IDR"
-      - name: outstanding_amount
-        description: "Outstanding balance in IDR"
-      - name: payment_status
-        description: "Payment status (Paid, Partially Paid, Outstanding)"
+          - relationships:
+              to: ref('dim_ruangan')
+              field: ruangan_key
+      - name: departemen_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_departemen')
+              field: departemen_key
+      - name: tanggal_masuk_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_tanggal')
+              field: tanggal_key
+
+  - name: fct_diagnosis
+    description: "Fact table diagnosis — grain: 1 baris per diagnosis per kunjungan"
+    columns:
+      - name: diagnosis_key
+        tests: [unique, not_null]
+      - name: refr_no
+        tests: [not_null]
+      - name: pasien_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_pasien')
+              field: pasien_key
+      - name: dokter_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_dokter')
+              field: dokter_key
+      - name: tanggal_diagnosis_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_tanggal')
+              field: tanggal_key
+
+  - name: fct_tindakan_medis
+    description: "Fact table tindakan medis — grain: 1 baris per tindakan per kunjungan"
+    columns:
+      - name: tindakan_key
+        tests: [unique, not_null]
+      - name: refr_no
+        tests: [not_null]
+      - name: pasien_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_pasien')
+              field: pasien_key
+      - name: tanggal_tindakan_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_tanggal')
+              field: tanggal_key

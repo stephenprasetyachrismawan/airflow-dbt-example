@@ -43,3 +43,7 @@ airflow-scheduler.pid
 
 # Documentation
 docs/generated/
+
+#archivedata
+data/archive/
+archive.zip
