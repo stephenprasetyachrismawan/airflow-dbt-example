@@ -118,6 +118,15 @@ dbt/models/marts/fct_kunjungan.sql         ← NEW
 dbt/models/marts/fct_diagnosis.sql         ← NEW
 dbt/models/marts/fct_tindakan_medis.sql    ← NEW
 dbt/models/marts/schema.yml                ← Updated total
-analytics/business_queries.sql             ← NEW (5 BQ)
+analytics/business_queries.sql             ← NEW (5 BQ, BQ5=konversi appointment)
+analytics/run_business_queries.py          ← NEW (eksekusi BQ1-BQ5)
+scripts/check_referential_integrity.py     ← NEW (16 FK checks, 3 fact tables)
+scripts/data_quality_check.py              ← NEW (completeness, uniqueness, validity)
+scripts/query_performance.py               ← NEW (benchmark sebelum/sesudah indexing)
+scripts/generate_final_report.py           ← NEW (laporan validasi akhir)
+view_datamart.py                           ← NEW (interactive viewer 8 tabel)
+CONNECTION_INFO.md                         ← NEW (info koneksi + schema tabel)
 HASIL_IMPLEMENTASI.md                      ← NEW (file ini)
+README.md                                  ← Updated
+.gitignore                                 ← Updated
 ```

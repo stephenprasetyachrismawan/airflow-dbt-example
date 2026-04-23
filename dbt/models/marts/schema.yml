@@ -1,325 +1,571 @@
 version: 2
 
 models:
-  - name: dim_date
-    description: "Tabel dimensi tanggal — berisi informasi kalender dari 2020 hingga 2026"
-    columns:
-      - name: date_key
-        description: "Surrogate key unik untuk setiap tanggal (integer berurutan)"
-        tests:
-          - unique
-          - not_null
-      - name: calendar_date
-        description: "Nilai tanggal aktual dalam format DATE"
-        tests:
-          - unique
-          - not_null
-      - name: year
-        description: "Tahun dari tanggal (contoh: 2024)"
-      - name: month
-        description: "Bulan dari tanggal dalam angka (1–12)"
-      - name: day
-        description: "Hari dalam bulan (1–31)"
-      - name: quarter
-        description: "Kuartal tahun (1–4)"
-      - name: week
-        description: "Minggu dalam tahun menurut ISO (1–53)"
-      - name: day_of_week
-        description: "Hari dalam minggu sebagai angka (1=Senin, 7=Minggu)"
-      - name: day_of_year
-        description: "Hari ke-berapa dalam tahun (1–366)"
-      - name: month_name
-        description: "Nama bulan dalam Bahasa Inggris (January, February, dst.)"
-      - name: day_name
-        description: "Nama hari dalam Bahasa Inggris (Monday, Tuesday, dst.)"
-      - name: is_weekend
-        description: "Flag boolean: TRUE jika hari Sabtu atau Minggu, FALSE jika hari kerja"
-      - name: season
-        description: "Musim berdasarkan bulan (Winter, Spring, Summer, Fall)"
 
-  - name: dim_patient
-    description: "Tabel dimensi pasien — menyimpan atribut master data pasien"
+  # ============================================================
+  # DIMENSI
+  # ============================================================
+
+  - name: dim_tanggal
+    description: >
+      Dimensi tanggal (SCD Type 0 — Retain Original).
+      Berisi kalender dari 2020-01-01 hingga 2027-12-31.
+      Tidak ada atribut yang berubah seiring waktu.
+      Role-playing dimension: digunakan sebagai tanggal_masuk_key DAN tanggal_keluar_key di fct_kunjungan,
+      serta tanggal_diagnosis_key di fct_diagnosis dan tanggal_tindakan_key di fct_tindakan_medis.
     columns:
-      - name: patient_key
-        description: "Surrogate key unik untuk setiap pasien (integer berurutan)"
+      - name: tanggal_key
+        description: "Surrogate key integer berurutan; -1 = unknown member"
+        tests:
+          - unique
+          - not_null
+      - name: tanggal
+        description: "Nilai tanggal aktual (DATE); NULL untuk unknown member"
+        tests:
+          - unique
+      - name: hari
+        description: "Hari dalam bulan (1–31)"
+      - name: bulan
+        description: "Nomor bulan (1–12)"
+        tests:
+          - accepted_values:
+              values: [1,2,3,4,5,6,7,8,9,10,11,12]
+              config:
+                where: "tanggal IS NOT NULL"
+      - name: tahun
+        description: "Tahun kalender (2020–2027)"
+      - name: kuartal
+        description: "Kuartal tahun (1–4)"
+        tests:
+          - accepted_values:
+              values: [1,2,3,4]
+              config:
+                where: "tanggal IS NOT NULL"
+      - name: minggu
+        description: "Nomor minggu dalam tahun menurut ISO (1–53)"
+      - name: nama_hari
+        description: "Nama hari dalam Bahasa Indonesia (Senin, Selasa, ..., Minggu)"
+        tests:
+          - accepted_values:
+              values: ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu']
+              config:
+                where: "tanggal IS NOT NULL"
+      - name: nama_bulan
+        description: "Nama bulan dalam Bahasa Indonesia (Januari, Februari, ..., Desember)"
+        tests:
+          - accepted_values:
+              values: ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
+              config:
+                where: "tanggal IS NOT NULL"
+      - name: is_weekend
+        description: "Boolean: TRUE jika Sabtu/Minggu"
+        tests:
+          - accepted_values:
+              values: [true, false]
+              config:
+                where: "tanggal IS NOT NULL"
+      - name: is_weekday
+        description: "Boolean: TRUE jika hari kerja (Senin–Jumat)"
+      - name: semester
+        description: "Semester tahun: 1 (Jan–Jun) atau 2 (Jul–Des)"
+        tests:
+          - accepted_values:
+              values: [1,2]
+              config:
+                where: "tanggal IS NOT NULL"
+      - name: hari_dalam_tahun
+        description: "Hari ke-berapa dalam tahun (1–366)"
+
+  - name: dim_pasien
+    description: >
+      Dimensi pasien (SCD Type 2 — Add New Row).
+      Grain: satu baris per versi historis pasien. Initial load menghasilkan satu baris per pasien.
+      Kolom dw_is_current=TRUE menandai baris aktif terkini.
+      Atribut jenis_penjamin dan nama_asuransi di-enrich dari tabel INSR (asuransi bukan dimensi terpisah).
+      Hierarki: tidak ada hierarki natural dalam dimensi ini.
+    columns:
+      - name: pasien_key
+        description: "Surrogate key integer berurutan; -1 = unknown member"
         tests:
           - unique
           - not_null
       - name: pat_id
         description: "Natural key — ID pasien dari sistem sumber"
         tests:
-          - unique
           - not_null
-      - name: f_name
+      - name: nama_lengkap
+        description: "Nama lengkap pasien (gabungan nama depan + tengah + belakang)"
+        tests:
+          - not_null
+      - name: nama_depan
         description: "Nama depan pasien"
-      - name: l_name
-        description: "Nama belakang pasien"
-      - name: m_name
-        description: "Nama tengah pasien (bisa null jika tidak ada)"
-      - name: full_name
-        description: "Nama lengkap pasien (gabungan nama depan dan belakang)"
-      - name: gender
+      - name: nama_tengah
+        description: "Nama tengah pasien (bisa kosong)"
+      - name: nama_belakang
+        description: "Nama belakang / nama keluarga pasien"
+      - name: jenis_kelamin
         description: "Jenis kelamin pasien (Male/Female)"
-      - name: dob
-        description: "Tanggal lahir pasien"
-      - name: birth_year
-        description: "Tahun lahir pasien (diekstrak dari dob)"
-      - name: current_age
-        description: "Usia pasien saat ini dalam tahun (dihitung dari dob)"
-      - name: blood_type
-        description: "Golongan darah pasien (A, B, AB, O dengan Rh positif/negatif)"
-      - name: marital_status
-        description: "Status pernikahan pasien (Single, Married, Divorced, Widowed)"
-      - name: contact_number
+      - name: tanggal_lahir
+        description: "Tanggal lahir pasien (DATE)"
+      - name: golongan_darah
+        description: "Golongan darah (A+, A-, B+, B-, AB+, AB-, O+, O-)"
+      - name: status_pernikahan
+        description: "Status pernikahan (Single, Married, Divorced, Widowed)"
+      - name: nomor_kontak
         description: "Nomor telepon pasien"
-      - name: email_address
+      - name: email
         description: "Alamat email pasien"
-      - name: national_id_number
-        description: "Nomor identitas nasional pasien (KTP/NIK)"
-      - name: national_id_expiry
-        description: "Tanggal kadaluarsa identitas nasional"
-      - name: emergency_contact_first_name
-        description: "Nama depan kontak darurat pasien"
-      - name: emergency_contact_last_name
-        description: "Nama belakang kontak darurat pasien"
-      - name: emergency_contact_number
-        description: "Nomor telepon kontak darurat pasien"
+      - name: jenis_penjamin
+        description: "Jenis penjamin/asuransi (di-enrich dari INSR; NULL jika tidak ada asuransi)"
+      - name: nama_asuransi
+        description: "Nama perusahaan asuransi (di-enrich dari INSR; NULL jika tidak ada)"
+      - name: dw_valid_from
+        description: "Tanggal mulai berlaku versi baris ini (SCD2)"
+      - name: dw_valid_to
+        description: "Tanggal berakhir versi baris ini (SCD2); NULL = masih aktif"
+      - name: dw_is_current
+        description: "Boolean: TRUE = baris aktif terkini"
+        tests:
+          - accepted_values:
+              values: [true, false]
       - name: dw_load_date
-        description: "Tanggal dan waktu data dimuat ke dalam data warehouse"
+        description: "Timestamp saat baris dimuat ke data warehouse"
 
-  - name: dim_doctor
-    description: "Tabel dimensi dokter/tenaga medis — menyimpan atribut master data staf medis"
+  - name: dim_dokter
+    description: >
+      Dimensi dokter (SCD Type 2 — Add New Row).
+      Hanya berisi staff dengan ROLE_DES = 'Doctor' (ROLE_CD = '0').
+      Grain: satu baris per versi historis dokter.
+      Atribut nama_departemen di-denormalisasi dari tabel DPMT.
+      Hierarki: Dokter → Departemen (dokter berada di satu departemen).
     columns:
-      - name: doctor_key
-        description: "Surrogate key unik untuk setiap dokter (integer berurutan)"
+      - name: dokter_key
+        description: "Surrogate key integer berurutan; -1 = unknown member"
         tests:
           - unique
           - not_null
-      - name: doctor_id
-        description: "Natural key — ID dokter/staf dari sistem sumber"
+      - name: stf_id
+        description: "Natural key — ID staff/dokter dari sistem sumber"
         tests:
-          - unique
           - not_null
-      - name: first_name
+      - name: nama_lengkap
+        description: "Nama lengkap dokter (gabungan nama depan + belakang)"
+      - name: nama_depan
         description: "Nama depan dokter"
-      - name: last_name
+      - name: nama_belakang
         description: "Nama belakang dokter"
-      - name: full_name
-        description: "Nama lengkap dokter (gabungan nama depan dan belakang)"
-      - name: gender_code
-        description: "Kode jenis kelamin dokter (M/F)"
-      - name: gender_description
-        description: "Deskripsi jenis kelamin dokter (Male/Female)"
-      - name: date_of_birth
+      - name: jenis_kelamin
+        description: "Jenis kelamin dokter (Male/Female)"
+      - name: tanggal_lahir
         description: "Tanggal lahir dokter"
-      - name: birth_year
-        description: "Tahun lahir dokter (diekstrak dari date_of_birth)"
-      - name: current_age
-        description: "Usia dokter saat ini dalam tahun"
-      - name: department_id
-        description: "ID departemen tempat dokter bertugas"
-      - name: role_code
-        description: "Kode peran/jabatan dokter dalam sistem (contoh: DR, SP, GEN)"
-      - name: role_description
-        description: "Deskripsi peran/jabatan dokter (General Practitioner, Specialist, dst.)"
-      - name: contact_number
+      - name: departemen_id
+        description: "ID departemen tempat dokter bertugas (FK ke dim_departemen via dep_id)"
+      - name: nama_departemen
+        description: "Nama departemen (denormalisasi dari DPMT)"
+      - name: kode_peran
+        description: "Kode peran numerik dari sistem sumber"
+      - name: deskripsi_peran
+        description: "Deskripsi peran — selalu 'Doctor' untuk dimensi ini"
+      - name: status_karyawan
+        description: "Status kepegawaian dokter (Active, Inactive, dll)"
+      - name: tanggal_masuk
+        description: "Tanggal mulai bekerja di rumah sakit (hire date)"
+      - name: tanggal_peran
+        description: "Tanggal dokter ditetapkan pada peran saat ini"
+      - name: gaji_tahunan
+        description: "Gaji tahunan dokter (DECIMAL)"
+      - name: nomor_kontak
         description: "Nomor telepon dokter"
-      - name: email_address
+      - name: email
         description: "Alamat email dokter"
-      - name: status_code
-        description: "Kode status aktif dokter (A=Active, I=Inactive)"
-      - name: status_description
-        description: "Deskripsi status dokter (Active, Inactive)"
-      - name: hire_date
-        description: "Tanggal dokter mulai bekerja di rumah sakit"
-      - name: role_date
-        description: "Tanggal dokter mendapatkan peran/jabatan saat ini"
-      - name: annual_salary
-        description: "Gaji tahunan dokter dalam IDR"
-      - name: monthly_salary
-        description: "Gaji bulanan dokter dalam IDR"
+      - name: dw_valid_from
+        description: "Tanggal mulai berlaku versi baris ini (SCD2)"
+      - name: dw_valid_to
+        description: "Tanggal berakhir versi baris ini (SCD2); NULL = masih aktif"
+      - name: dw_is_current
+        description: "Boolean: TRUE = baris aktif terkini"
+        tests:
+          - accepted_values:
+              values: [true, false]
       - name: dw_load_date
-        description: "Tanggal dan waktu data dimuat ke dalam data warehouse"
+        description: "Timestamp saat baris dimuat ke data warehouse"
 
-  - name: dim_room
-    description: "Tabel dimensi ruangan — menyimpan informasi kamar dan ruang perawatan rumah sakit"
+  - name: dim_departemen
+    description: >
+      Dimensi departemen (SCD Type 1 — Overwrite).
+      Grain: satu baris per departemen.
+      Perubahan nama/lokasi departemen langsung menimpa nilai lama tanpa histori.
+      Conformed dimension: digunakan oleh fct_kunjungan, fct_diagnosis, dan fct_tindakan_medis.
+      Hierarki: Departemen → Lokasi (blok, lantai).
     columns:
-      - name: room_key
-        description: "Surrogate key unik untuk setiap ruangan (integer berurutan)"
+      - name: departemen_key
+        description: "Surrogate key integer berurutan; -1 = unknown member"
         tests:
           - unique
           - not_null
-      - name: room_id
-        description: "Natural key — ID ruangan dari sistem sumber"
-        tests:
-          - unique
-          - not_null
-      - name: room_type_code
-        description: "Kode tipe ruangan (contoh: STD=Standard, PRM=Premium, ICU)"
-      - name: room_type_description
-        description: "Deskripsi tipe ruangan (Standard, Premium, ICU, VIP, dst.)"
-      - name: room_purpose_code
-        description: "Kode fungsi/tujuan ruangan (contoh: IP=Inpatient, OP=Outpatient)"
-      - name: room_purpose_description
-        description: "Deskripsi fungsi ruangan (Inpatient, Outpatient, Surgery, dst.)"
-      - name: room_capacity
-        description: "Kapasitas ruangan — jumlah maksimal pasien yang dapat ditampung"
-      - name: department_id
-        description: "ID departemen pemilik ruangan (foreign key ke dim_department)"
-      - name: department_name
-        description: "Nama departemen pemilik ruangan (denormalisasi dari dim_department)"
-      - name: department_location
-        description: "Lokasi/gedung departemen pemilik ruangan"
-      - name: room_description
-        description: "Deskripsi lengkap ruangan (gabungan nama departemen dan tipe ruangan)"
-      - name: dw_load_date
-        description: "Tanggal dan waktu data dimuat ke dalam data warehouse"
-
-  - name: dim_department
-    description: "Tabel dimensi departemen — menyimpan informasi unit/departemen rumah sakit"
-    columns:
-      - name: department_key
-        description: "Surrogate key unik untuk setiap departemen (integer berurutan)"
-        tests:
-          - unique
-          - not_null
-      - name: department_id
+      - name: dep_id
         description: "Natural key — ID departemen dari sistem sumber"
         tests:
           - unique
           - not_null
-      - name: department_name
-        description: "Nama departemen rumah sakit (contoh: Cardiology, Orthopedics)"
+      - name: nama_departemen
+        description: "Nama departemen rumah sakit (Cardiology, Neurology, dll)"
         tests:
           - not_null
-      - name: department_description
-        description: "Deskripsi singkat tentang layanan yang diberikan departemen"
-      - name: department_location
-        description: "Lokasi fisik departemen (gedung, lantai, atau wing)"
-
-  - name: fct_visit
-    description: "Tabel fakta kunjungan pasien — setiap baris mewakili satu kunjungan pasien ke rumah sakit"
-    columns:
-      - name: visit_key
-        description: "Surrogate key unik untuk setiap record kunjungan (integer berurutan)"
-        tests:
-          - unique
-          - not_null
-      - name: visit_id
-        description: "Natural key — nomor referral/kunjungan dari sistem sumber"
-        tests:
-          - unique
-          - not_null
-      - name: patient_key
-        description: "Foreign key ke dim_patient; nilai -1 menandakan pasien tidak dikenal (unknown)"
-        tests:
-          - relationships:
-              to: ref('dim_patient')
-              field: patient_key
-      - name: doctor_key
-        description: "Foreign key ke dim_doctor; nilai -1 menandakan dokter tidak dikenal"
-      - name: room_key
-        description: "Foreign key ke dim_room; nilai -1 menandakan ruangan tidak dikenal"
-      - name: department_key
-        description: "Foreign key ke dim_department; nilai -1 menandakan departemen tidak dikenal"
-      - name: visit_date_key
-        description: "Foreign key ke dim_date berdasarkan tanggal mulai kunjungan"
-      - name: visit_start_time
-        description: "Waktu mulai kunjungan pasien (timestamp lengkap)"
-      - name: visit_end_time
-        description: "Waktu selesai kunjungan pasien (timestamp lengkap; null jika masih berlangsung)"
-      - name: length_of_stay_hours
-        description: "Durasi kunjungan dalam jam (dihitung dari visit_start_time ke visit_end_time)"
-      - name: is_inpatient
-        description: "Flag boolean: TRUE jika pasien rawat inap, FALSE jika rawat jalan"
-      - name: visit_status_code
-        description: "Kode status kunjungan (contoh: COMP=Completed, ONG=Ongoing, CAN=Cancelled)"
-      - name: visit_status_description
-        description: "Deskripsi status kunjungan (Completed, Ongoing, Cancelled)"
-      - name: visit_type_code
-        description: "Kode tipe kunjungan (contoh: IP=Inpatient, OP=Outpatient, ER=Emergency)"
-      - name: visit_type_description
-        description: "Deskripsi tipe kunjungan (Inpatient, Outpatient, Emergency)"
-      - name: patient_first_name
-        description: "Nama depan pasien (denormalisasi dari data kunjungan, bukan dim_patient)"
-      - name: patient_last_name
-        description: "Nama belakang pasien (denormalisasi dari data kunjungan)"
-      - name: patient_gender
-        description: "Jenis kelamin pasien saat kunjungan"
-      - name: patient_dob
-        description: "Tanggal lahir pasien saat kunjungan (degenerate dimension)"
-      - name: blood_type
-        description: "Golongan darah pasien saat kunjungan (degenerate dimension)"
-      - name: marital_status
-        description: "Status pernikahan pasien saat kunjungan (degenerate dimension)"
-      - name: room_type_code
-        description: "Kode tipe ruangan yang digunakan saat kunjungan (degenerate dimension)"
-      - name: room_type_description
-        description: "Deskripsi tipe ruangan saat kunjungan (degenerate dimension)"
-      - name: room_capacity
-        description: "Kapasitas ruangan yang digunakan saat kunjungan"
-      - name: room_purpose_code
-        description: "Kode fungsi ruangan saat kunjungan (degenerate dimension)"
-      - name: department_name
-        description: "Nama departemen yang menangani kunjungan (degenerate dimension)"
-      - name: department_location
-        description: "Lokasi departemen saat kunjungan (degenerate dimension)"
+      - name: deskripsi
+        description: "Deskripsi singkat layanan departemen"
+      - name: lokasi
+        description: "Lokasi fisik departemen (contoh: Block A, Floor 1)"
+      - name: blok
+        description: "Blok/gedung departemen (diekstrak dari lokasi)"
+      - name: lantai
+        description: "Lantai departemen (diekstrak dari lokasi)"
       - name: dw_load_date
-        description: "Tanggal dan waktu record ini dimuat ke dalam data warehouse"
+        description: "Timestamp saat baris pertama kali dimuat"
+      - name: dw_updated_date
+        description: "Timestamp terakhir baris diperbarui (SCD1)"
 
-  - name: fct_billing
-    description: "Tabel fakta penagihan — setiap baris mewakili satu transaksi billing pasien"
+  - name: dim_ruangan
+    description: >
+      Dimensi ruangan (SCD Type 1 — Overwrite).
+      Grain: satu baris per ruangan.
+      Termasuk departemen_id sebagai FK ke dim_departemen.
+      Hierarki: Ruangan → Departemen → Lokasi.
+      Outrigger dimension: tidak ada.
+      Junk dimension: tidak diterapkan karena atribut status disimpan langsung sebagai degenerate dimension di fact tables.
     columns:
-      - name: billing_key
-        description: "Surrogate key unik untuk setiap record billing (integer berurutan)"
+      - name: ruangan_key
+        description: "Surrogate key integer berurutan; -1 = unknown member"
         tests:
           - unique
           - not_null
-      - name: billing_id
-        description: "Nomor referral dari sistem sumber — satu referral dapat memiliki beberapa billing"
+      - name: rom_id
+        description: "Natural key — ID ruangan dari sistem sumber"
         tests:
+          - unique
           - not_null
-      - name: patient_key
-        description: "Foreign key ke dim_patient; nilai -1 menandakan pasien tidak dikenal"
-        tests:
-          - relationships:
-              to: ref('dim_patient')
-              field: patient_key
-      - name: billing_date_key
-        description: "Foreign key ke dim_date berdasarkan tanggal billing"
-      - name: billing_date
-        description: "Tanggal transaksi billing dilakukan"
-      - name: billing_amount
-        description: "Total tagihan dalam IDR (jumlah yang harus dibayar pasien)"
-        tests:
-          - not_null
-      - name: payment_amount
-        description: "Total pembayaran yang sudah diterima dalam IDR"
-      - name: outstanding_amount
-        description: "Sisa tagihan yang belum dibayar dalam IDR (billing_amount - payment_amount)"
-      - name: billing_status_code
-        description: "Kode status billing (contoh: PAID, PART=Partially Paid, OUTS=Outstanding)"
-      - name: billing_status_description
-        description: "Deskripsi status billing (Paid, Partially Paid, Outstanding)"
-      - name: billing_type_code
-        description: "Kode tipe billing (contoh: INP=Inpatient, OUT=Outpatient, CONS=Consultation)"
-      - name: billing_source
-        description: "Sumber billing — dari sistem atau modul mana billing ini berasal"
-      - name: payment_date
-        description: "Tanggal pembayaran diterima (null jika belum dibayar)"
-      - name: payment_method_code
-        description: "Kode metode pembayaran (contoh: CASH, CC=Credit Card, INS=Insurance)"
-      - name: payment_method_description
-        description: "Deskripsi metode pembayaran (Cash, Credit Card, Insurance, dst.)"
-      - name: payment_status_code
-        description: "Kode status pembayaran dari perspektif kliring"
-      - name: payment_status_description
-        description: "Deskripsi status pembayaran"
-      - name: payment_status
-        description: "Status pembayaran ringkas (Paid, Partially Paid, Outstanding)"
-      - name: patient_first_name
-        description: "Nama depan pasien (denormalisasi dari data billing)"
-      - name: patient_last_name
-        description: "Nama belakang pasien (denormalisasi dari data billing)"
+      - name: departemen_id
+        description: "ID departemen pemilik ruangan (FK logis ke dim_departemen.dep_id)"
+      - name: nama_departemen
+        description: "Nama departemen pemilik (denormalisasi dari DPMT)"
+      - name: kode_tujuan
+        description: "Kode tujuan ruangan (Inpatient, Outpatient, Surgery)"
+      - name: deskripsi_tujuan
+        description: "Deskripsi tujuan ruangan"
+      - name: kode_tipe
+        description: "Kode tipe ruangan (Standard, Premium, ICU)"
+      - name: deskripsi_tipe
+        description: "Deskripsi tipe ruangan"
+      - name: kapasitas
+        description: "Kapasitas ruangan — jumlah maksimal pasien"
       - name: dw_load_date
-        description: "Tanggal dan waktu record ini dimuat ke dalam data warehouse"
+        description: "Timestamp saat baris pertama kali dimuat"
+      - name: dw_updated_date
+        description: "Timestamp terakhir baris diperbarui (SCD1)"
+
+  # ============================================================
+  # FAKTA
+  # ============================================================
+
+  - name: fct_kunjungan
+    description: >
+      Tabel fakta kunjungan (Transaction Fact Table).
+      Grain: satu baris per satu kunjungan pasien ke rumah sakit.
+      Sumber: VIST (kunjungan) di-enrich dengan APPT (appointment) via PAT_ID + tanggal proximity ≤30 hari.
+      Appointment BUKAN fact table terpisah — terintegrasi di sini via kolom is_dari_appointment dan is_appointment_converted.
+
+      Klasifikasi measures:
+      - durasi_kunjungan_jam: ADDITIVE (bisa dijumlahkan di semua dimensi, misal total jam rawat per departemen)
+      - is_rawat_inap: NON-ADDITIVE (boolean flag, hanya bisa di-COUNT atau di-SUM sebagai indikator 0/1)
+      - is_dari_appointment: NON-ADDITIVE (boolean flag)
+      - is_appointment_converted: NON-ADDITIVE (boolean flag)
+
+      Degenerate dimensions: refr_no, medt_id, appt_refr_no, kode_status_kunjungan, deskripsi_status_kunjungan, kode_tipe_kunjungan, deskripsi_tipe_kunjungan.
+    columns:
+      - name: kunjungan_key
+        description: "Surrogate key unik per kunjungan"
+        tests:
+          - unique
+          - not_null
+      - name: pasien_key
+        description: "FK ke dim_pasien; -1 = pasien tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_pasien')
+              field: pasien_key
+      - name: dokter_key
+        description: "FK ke dim_dokter; -1 = dokter tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_dokter')
+              field: dokter_key
+      - name: ruangan_key
+        description: "FK ke dim_ruangan; -1 = ruangan tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_ruangan')
+              field: ruangan_key
+      - name: departemen_key
+        description: "FK ke dim_departemen; -1 = departemen tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_departemen')
+              field: departemen_key
+      - name: tanggal_masuk_key
+        description: "FK ke dim_tanggal berdasarkan tanggal masuk kunjungan (role-playing dimension: tanggal masuk)"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_tanggal')
+              field: tanggal_key
+      - name: tanggal_keluar_key
+        description: "FK ke dim_tanggal berdasarkan tanggal keluar kunjungan (role-playing dimension: tanggal keluar); -1 jika belum keluar"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_tanggal')
+              field: tanggal_key
+      - name: refr_no
+        description: "Degenerate dimension — nomor referensi kunjungan dari sistem sumber"
+        tests:
+          - unique
+          - not_null
+      - name: medt_id
+        description: "Degenerate dimension — ID tim medis yang menangani"
+      - name: appt_refr_no
+        description: "Degenerate dimension — nomor referensi appointment terkait (NULL jika walk-in)"
+      - name: kode_status_kunjungan
+        description: "Degenerate dimension — kode status kunjungan"
+      - name: deskripsi_status_kunjungan
+        description: "Degenerate dimension — deskripsi status kunjungan (Admitted, Discharged, dll)"
+      - name: kode_tipe_kunjungan
+        description: "Degenerate dimension — kode tipe kunjungan"
+      - name: deskripsi_tipe_kunjungan
+        description: "Degenerate dimension — deskripsi tipe (Diagnosis, Treatment)"
+      - name: kode_status_appointment
+        description: "Degenerate dimension — status appointment terkait (NULL jika walk-in)"
+      - name: deskripsi_status_appointment
+        description: "Degenerate dimension — deskripsi status appointment"
+      - name: kode_tipe_appointment
+        description: "Degenerate dimension — tipe appointment"
+      - name: durasi_kunjungan_jam
+        description: "MEASURE (ADDITIVE) — durasi kunjungan dalam jam, dihitung dari waktu_masuk ke waktu_keluar"
+      - name: is_rawat_inap
+        description: "MEASURE (NON-ADDITIVE) — boolean: TRUE jika pasien rawat inap (VSTAT_DES = 'Admitted')"
+        tests:
+          - accepted_values:
+              values: [true, false]
+      - name: is_dari_appointment
+        description: "MEASURE (NON-ADDITIVE) — boolean: TRUE jika kunjungan berasal dari appointment"
+        tests:
+          - accepted_values:
+              values: [true, false]
+      - name: is_appointment_converted
+        description: "MEASURE (NON-ADDITIVE) — boolean: TRUE jika appointment berhasil dikonversi menjadi kunjungan"
+        tests:
+          - accepted_values:
+              values: [true, false]
+      - name: jam_masuk
+        description: "Jam masuk kunjungan (TIME)"
+      - name: jam_keluar
+        description: "Jam keluar kunjungan (TIME); NULL jika belum keluar"
+      - name: waktu_masuk
+        description: "Timestamp lengkap waktu masuk"
+      - name: waktu_keluar
+        description: "Timestamp lengkap waktu keluar; NULL jika belum keluar"
+      - name: dw_load_date
+        description: "Timestamp saat record dimuat ke data warehouse"
+
+  - name: fct_diagnosis
+    description: >
+      Tabel fakta diagnosis (Transaction Fact Table).
+      Grain: satu baris per satu diagnosis per kunjungan.
+      Sumber: DIAG (di-UNION ALL dari 2 file CSV).
+      Satu kunjungan bisa memiliki >1 diagnosis (multi-valued).
+
+      Klasifikasi measures:
+      - total_biaya_diagnosis: ADDITIVE (bisa dijumlahkan di semua dimensi)
+      - jumlah_diagnosis: ADDITIVE (selalu bernilai 1 per baris; SUM = total diagnosis)
+      - is_diagnosis_utama: NON-ADDITIVE (boolean flag)
+      - is_confirmed: NON-ADDITIVE (boolean flag)
+
+      Degenerate dimensions: refr_no, urutan_diagnosis, kode_diagnosis, deskripsi_diagnosis, kode_status, deskripsi_status, kode_tipe, deskripsi_tipe.
+    columns:
+      - name: diagnosis_key
+        description: "Surrogate key unik per record diagnosis"
+        tests:
+          - unique
+          - not_null
+      - name: pasien_key
+        description: "FK ke dim_pasien; -1 = pasien tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_pasien')
+              field: pasien_key
+      - name: dokter_key
+        description: "FK ke dim_dokter; -1 = dokter tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_dokter')
+              field: dokter_key
+      - name: ruangan_key
+        description: "FK ke dim_ruangan; -1 = ruangan tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_ruangan')
+              field: ruangan_key
+      - name: departemen_key
+        description: "FK ke dim_departemen; -1 = departemen tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_departemen')
+              field: departemen_key
+      - name: tanggal_diagnosis_key
+        description: "FK ke dim_tanggal berdasarkan tanggal diagnosis"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_tanggal')
+              field: tanggal_key
+      - name: refr_no
+        description: "Degenerate dimension — nomor referensi kunjungan terkait"
+        tests:
+          - not_null
+      - name: urutan_diagnosis
+        description: "Degenerate dimension — urutan diagnosis dalam satu kunjungan (sequence)"
+      - name: kode_diagnosis
+        description: "Degenerate dimension — kode diagnosis (ICD-like)"
+      - name: deskripsi_diagnosis
+        description: "Degenerate dimension — deskripsi diagnosis"
+      - name: kode_status
+        description: "Degenerate dimension — kode status diagnosis"
+      - name: deskripsi_status
+        description: "Degenerate dimension — deskripsi status (Confirmed, Recurrent, dll)"
+      - name: kode_tipe
+        description: "Degenerate dimension — kode tipe rekomendasi treatment"
+      - name: deskripsi_tipe
+        description: "Degenerate dimension — deskripsi tipe rekomendasi"
+      - name: total_biaya_diagnosis
+        description: "MEASURE (ADDITIVE) — total biaya diagnosis"
+      - name: jumlah_diagnosis
+        description: "MEASURE (ADDITIVE) — selalu 1 per baris; SUM = total diagnosis per kunjungan/periode"
+      - name: waktu_diagnosis
+        description: "Timestamp waktu diagnosis dicatat"
+      - name: is_diagnosis_utama
+        description: "MEASURE (NON-ADDITIVE) — boolean: TRUE jika diagnosis utama (kode_tipe = '0')"
+        tests:
+          - accepted_values:
+              values: [true, false]
+      - name: is_confirmed
+        description: "MEASURE (NON-ADDITIVE) — boolean: TRUE jika diagnosis sudah dikonfirmasi"
+        tests:
+          - accepted_values:
+              values: [true, false]
+      - name: dw_load_date
+        description: "Timestamp saat record dimuat ke data warehouse"
+
+  - name: fct_tindakan_medis
+    description: >
+      Tabel fakta tindakan medis / treatment (Transaction Fact Table).
+      Grain: satu baris per satu tindakan medis per kunjungan.
+      Sumber: TRTM (treatment).
+      Satu kunjungan bisa memiliki >1 tindakan (multi-valued).
+
+      Klasifikasi measures:
+      - total_biaya_tindakan: ADDITIVE (bisa dijumlahkan; catatan: nilainya 1–10, kemungkinan unit/kuantitas bukan nominal rupiah)
+      - jumlah_tindakan: ADDITIVE (selalu 1 per baris; SUM = total tindakan per kunjungan/periode)
+      - is_selesai: NON-ADDITIVE (boolean flag)
+      - is_operasi: NON-ADDITIVE (boolean flag)
+      - is_obat: NON-ADDITIVE (boolean flag)
+
+      Degenerate dimensions: refr_no, urutan_tindakan, kode_tindakan, kode_tipe_tindakan, deskripsi_tipe_tindakan, kode_status_tindakan, deskripsi_status_tindakan, deskripsi_tindakan.
+    columns:
+      - name: tindakan_key
+        description: "Surrogate key unik per record tindakan medis"
+        tests:
+          - unique
+          - not_null
+      - name: pasien_key
+        description: "FK ke dim_pasien; -1 = pasien tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_pasien')
+              field: pasien_key
+      - name: dokter_key
+        description: "FK ke dim_dokter; -1 = dokter tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_dokter')
+              field: dokter_key
+      - name: ruangan_key
+        description: "FK ke dim_ruangan; -1 = ruangan tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_ruangan')
+              field: ruangan_key
+      - name: departemen_key
+        description: "FK ke dim_departemen; -1 = departemen tidak dikenal"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_departemen')
+              field: departemen_key
+      - name: tanggal_tindakan_key
+        description: "FK ke dim_tanggal berdasarkan tanggal tindakan dilakukan"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_tanggal')
+              field: tanggal_key
+      - name: refr_no
+        description: "Degenerate dimension — nomor referensi kunjungan terkait"
+        tests:
+          - not_null
+      - name: urutan_tindakan
+        description: "Degenerate dimension — urutan tindakan dalam satu kunjungan"
+      - name: kode_tindakan
+        description: "Degenerate dimension — kode tindakan medis"
+      - name: kode_tipe_tindakan
+        description: "Degenerate dimension — kode tipe tindakan (Surgery, Medication, dll)"
+      - name: deskripsi_tipe_tindakan
+        description: "Degenerate dimension — deskripsi tipe tindakan"
+      - name: kode_status_tindakan
+        description: "Degenerate dimension — kode status tindakan"
+      - name: deskripsi_status_tindakan
+        description: "Degenerate dimension — deskripsi status (Completed, Ongoing, Planned)"
+      - name: deskripsi_tindakan
+        description: "Degenerate dimension — deskripsi lengkap tindakan"
+      - name: total_biaya_tindakan
+        description: "MEASURE (ADDITIVE) — total biaya tindakan (catatan: nilai 1–10, kemungkinan unit/kuantitas)"
+      - name: jumlah_tindakan
+        description: "MEASURE (ADDITIVE) — selalu 1 per baris; SUM = total tindakan per kunjungan/periode"
+      - name: waktu_tindakan
+        description: "Timestamp waktu tindakan dilakukan"
+      - name: is_selesai
+        description: "MEASURE (NON-ADDITIVE) — boolean: TRUE jika tindakan sudah selesai (Completed)"
+        tests:
+          - accepted_values:
+              values: [true, false]
+      - name: is_operasi
+        description: "MEASURE (NON-ADDITIVE) — boolean: TRUE jika tindakan adalah operasi/surgery"
+        tests:
+          - accepted_values:
+              values: [true, false]
+      - name: is_obat
+        description: "MEASURE (NON-ADDITIVE) — boolean: TRUE jika tindakan adalah pemberian obat/medikasi"
+        tests:
+          - accepted_values:
+              values: [true, false]
+      - name: dw_load_date
+        description: "Timestamp saat record dimuat ke data warehouse"

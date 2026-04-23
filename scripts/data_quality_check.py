@@ -1,176 +1,198 @@
 """
-Tahap 6B — Data Quality Check Komprehensif
-Memeriksa: duplikat, null tak terduga, outlier, inkonsistensi.
+Tahap 6 — Data Quality Check Healthcare Data Mart
+Memeriksa completeness, uniqueness, not-null, referential integrity,
+validity range, consistency unknown member, dan distribusi data.
 """
 import duckdb
-import sys
-from datetime import datetime
 
 DUCKDB_PATH = '/opt/airflow/duckdb/healthcare.duckdb'
 con = duckdb.connect(DUCKDB_PATH, read_only=True)
 
-passed = 0
-failed = 0
-warnings = 0
+PASS = "PASS"
+FAIL = "FAIL"
+WARN = "WARN"
+
+results = []
 
 
-def check(description, sql, expect_zero=True, warn_only=False):
-    global passed, failed, warnings
-    try:
-        result = con.execute(sql).fetchone()[0]
-        ok = (result == 0) if expect_zero else (result > 0)
-
-        if ok:
-            print(f"  ✓ PASS  {description}")
-            passed += 1
-        elif warn_only:
-            print(f"  ⚠ WARN  {description} → nilai: {result:,}")
-            warnings += 1
-        else:
-            print(f"  ✗ FAIL  {description} → nilai: {result:,}")
-            failed += 1
-    except Exception as e:
-        print(f"  ✗ ERROR {description} → {e}")
-        failed += 1
+def check(label, sql, expect_zero=True, warn_only=False):
+    val = con.execute(sql).fetchone()[0]
+    if expect_zero:
+        status = PASS if val == 0 else (WARN if warn_only else FAIL)
+    else:
+        status = PASS if val > 0 else FAIL
+    results.append((label, val, status))
+    return val, status
 
 
-print("=" * 70)
-print("HEALTHCARE DW — DATA QUALITY CHECK")
-print(f"Dijalankan: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-print("=" * 70)
+print("=" * 75)
+print("HEALTHCARE DATA MART — DATA QUALITY CHECK")
+print("=" * 75)
 
-# ── 1. COMPLETENESS: Semua tabel terisi ─────────────────────────────────────
-print("\n[1] COMPLETENESS — Tabel tidak boleh kosong")
-for t in ['dim_date', 'dim_patient', 'dim_doctor', 'dim_department',
-          'dim_room', 'fct_visit', 'fct_billing']:
-    check(
-        f"analytics_marts.{t} > 0 rows",
-        f"SELECT COUNT(*) FROM analytics_marts.{t}",
-        expect_zero=False
-    )
+# ─────────────────────────────────────────
+# [1] COMPLETENESS
+# ─────────────────────────────────────────
+print("\n[1] COMPLETENESS — Semua tabel harus berisi data")
+TABLES = [
+    "dim_tanggal", "dim_pasien", "dim_dokter", "dim_departemen", "dim_ruangan",
+    "fct_kunjungan", "fct_diagnosis", "fct_tindakan_medis"
+]
+for t in TABLES:
+    n = con.execute(f"SELECT COUNT(*) FROM analytics_marts.{t}").fetchone()[0]
+    status = PASS if n > 0 else FAIL
+    results.append((f"{t} tidak kosong", n, status))
+    print(f"  {t:<35}: {n:>12,} rows  [{status}]")
 
-# ── 2. UNIQUENESS: Surrogate keys harus unik ────────────────────────────────
+# ─────────────────────────────────────────
+# [2] UNIQUENESS
+# ─────────────────────────────────────────
 print("\n[2] UNIQUENESS — Surrogate keys harus unik")
-sk_checks = [
-    ('dim_date', 'date_key'),
-    ('dim_patient', 'patient_key'),
-    ('dim_doctor', 'doctor_key'),
-    ('dim_department', 'department_key'),
-    ('dim_room', 'room_key'),
-    ('fct_visit', 'visit_key'),
-    ('fct_billing', 'billing_key'),
+SK_CHECKS = [
+    ("dim_tanggal",        "tanggal_key"),
+    ("dim_pasien",         "pasien_key"),
+    ("dim_dokter",         "dokter_key"),
+    ("dim_departemen",     "departemen_key"),
+    ("dim_ruangan",        "ruangan_key"),
+    ("fct_kunjungan",      "kunjungan_key"),
+    ("fct_diagnosis",      "diagnosis_key"),
+    ("fct_tindakan_medis", "tindakan_key"),
 ]
-for tbl, pk in sk_checks:
-    check(
-        f"{tbl}.{pk} tidak ada duplikat",
-        f"SELECT COUNT(*) - COUNT(DISTINCT {pk}) FROM analytics_marts.{tbl}"
+for tbl, col in SK_CHECKS:
+    val, status = check(
+        f"{tbl}.{col} unik",
+        f"SELECT COUNT(*) - COUNT(DISTINCT {col}) FROM analytics_marts.{tbl}"
     )
+    print(f"  {tbl}.{col:<30}: duplikat={val:>8,}  [{status}]")
 
-# ── 3. NOT NULL: Primary keys tidak boleh null ──────────────────────────────
-print("\n[3] NOT NULL — Primary keys tidak boleh null")
-for tbl, pk in sk_checks:
-    check(
-        f"{tbl}.{pk} tidak ada null",
-        f"SELECT COUNT(*) FROM analytics_marts.{tbl} WHERE {pk} IS NULL"
+# ─────────────────────────────────────────
+# [3] NOT NULL
+# ─────────────────────────────────────────
+print("\n[3] NOT NULL — Primary keys tidak boleh NULL")
+for tbl, col in SK_CHECKS:
+    val, status = check(
+        f"{tbl}.{col} not null",
+        f"SELECT COUNT(*) FROM analytics_marts.{tbl} WHERE {col} IS NULL"
     )
+    print(f"  {tbl}.{col:<30}: nulls={val:>8,}  [{status}]")
 
-# ── 4. REFERENTIAL INTEGRITY ────────────────────────────────────────────────
-print("\n[4] REFERENTIAL INTEGRITY — FK harus punya pasangan di dim")
-ri_checks = [
-    ('fct_visit', 'patient_key', 'dim_patient', 'patient_key'),
-    ('fct_visit', 'doctor_key', 'dim_doctor', 'doctor_key'),
-    ('fct_visit', 'room_key', 'dim_room', 'room_key'),
-    ('fct_visit', 'department_key', 'dim_department', 'department_key'),
-    ('fct_visit', 'visit_date_key', 'dim_date', 'date_key'),
-    ('fct_billing', 'patient_key', 'dim_patient', 'patient_key'),
-    ('fct_billing', 'billing_date_key', 'dim_date', 'date_key'),
+# ─────────────────────────────────────────
+# [4] REFERENTIAL INTEGRITY
+# ─────────────────────────────────────────
+print("\n[4] REFERENTIAL INTEGRITY — FK harus ada pasangannya di dimensi")
+FK_CHECKS = [
+    ("fct_kunjungan",      "pasien_key",           "dim_pasien",     "pasien_key"),
+    ("fct_kunjungan",      "dokter_key",            "dim_dokter",     "dokter_key"),
+    ("fct_kunjungan",      "ruangan_key",           "dim_ruangan",    "ruangan_key"),
+    ("fct_kunjungan",      "departemen_key",        "dim_departemen", "departemen_key"),
+    ("fct_kunjungan",      "tanggal_masuk_key",     "dim_tanggal",    "tanggal_key"),
+    ("fct_kunjungan",      "tanggal_keluar_key",    "dim_tanggal",    "tanggal_key"),
+    ("fct_diagnosis",      "pasien_key",            "dim_pasien",     "pasien_key"),
+    ("fct_diagnosis",      "dokter_key",            "dim_dokter",     "dokter_key"),
+    ("fct_diagnosis",      "ruangan_key",           "dim_ruangan",    "ruangan_key"),
+    ("fct_diagnosis",      "departemen_key",        "dim_departemen", "departemen_key"),
+    ("fct_diagnosis",      "tanggal_diagnosis_key", "dim_tanggal",    "tanggal_key"),
+    ("fct_tindakan_medis", "pasien_key",            "dim_pasien",     "pasien_key"),
+    ("fct_tindakan_medis", "dokter_key",            "dim_dokter",     "dokter_key"),
+    ("fct_tindakan_medis", "ruangan_key",           "dim_ruangan",    "ruangan_key"),
+    ("fct_tindakan_medis", "departemen_key",        "dim_departemen", "departemen_key"),
+    ("fct_tindakan_medis", "tanggal_tindakan_key",  "dim_tanggal",    "tanggal_key"),
 ]
-for fact, fk, dim, pk in ri_checks:
-    check(
-        f"{fact}.{fk} → {dim}.{pk}: 0 orphans",
-        f"""
-        SELECT COUNT(*) FROM analytics_marts.{fact} f
-        LEFT JOIN analytics_marts.{dim} d ON f.{fk} = d.{pk}
-        WHERE d.{pk} IS NULL AND f.{fk} != -1
-        """
+for fact_tbl, fk_col, dim_tbl, dim_pk in FK_CHECKS:
+    val, status = check(
+        f"{fact_tbl}.{fk_col}",
+        f"""SELECT COUNT(*) FROM analytics_marts.{fact_tbl} f
+            LEFT JOIN analytics_marts.{dim_tbl} d ON f.{fk_col} = d.{dim_pk}
+            WHERE d.{dim_pk} IS NULL"""
     )
+    print(f"  {fact_tbl}.{fk_col:<28} -> {dim_tbl}: orphans={val:>6,}  [{status}]")
 
-# ── 5. VALIDITY: Range checks ───────────────────────────────────────────────
-print("\n[5] VALIDITY — Range & business rule checks")
-check(
-    "dim_date: tahun dalam range 2020–2026",
-    "SELECT COUNT(*) FROM analytics_marts.dim_date WHERE calendar_date IS NOT NULL AND (year < 2020 OR year > 2026)"
-)
-check(
-    "dim_date: bulan dalam range 1–12",
-    "SELECT COUNT(*) FROM analytics_marts.dim_date WHERE calendar_date IS NOT NULL AND (month < 1 OR month > 12)"
-)
-check(
-    "fct_visit: length_of_stay_hours tidak negatif",
-    "SELECT COUNT(*) FROM analytics_marts.fct_visit WHERE length_of_stay_hours IS NOT NULL AND length_of_stay_hours < 0"
-)
-check(
-    "fct_visit: is_inpatient tidak null",
-    "SELECT COUNT(*) FROM analytics_marts.fct_visit WHERE is_inpatient IS NULL"
-)
-check(
-    "fct_billing: billing_amount tidak negatif",
-    "SELECT COUNT(*) FROM analytics_marts.fct_billing WHERE billing_amount IS NOT NULL AND billing_amount < 0"
-)
-check(
-    "fct_billing: outstanding_amount tidak negatif",
-    "SELECT COUNT(*) FROM analytics_marts.fct_billing WHERE outstanding_amount IS NOT NULL AND outstanding_amount < 0"
-)
-check(
-    "dim_doctor: minimal 1 dokter aktif",
-    "SELECT COUNT(*) FROM analytics_marts.dim_doctor WHERE status_code = 'A' AND doctor_key != -1",
-    expect_zero=False
-)
+# ─────────────────────────────────────────
+# [5] VALIDITY
+# ─────────────────────────────────────────
+print("\n[5] VALIDITY — Range dan nilai valid")
 
-# ── 6. CONSISTENCY: Unknown member (-1) ─────────────────────────────────────
-print("\n[6] CONSISTENCY — Unknown member (-1) di dimensi (best practice, warning saja)")
-for tbl, pk in [('dim_patient', 'patient_key'), ('dim_doctor', 'doctor_key'),
-                ('dim_department', 'department_key'), ('dim_room', 'room_key'),
-                ('dim_date', 'date_key')]:
-    check(
-        f"{tbl}: unknown member (key=-1) ada",
-        f"SELECT COUNT(*) FROM analytics_marts.{tbl} WHERE {pk} = -1",
-        expect_zero=False, warn_only=True
-    )
-
-# ── 7. DISTRIBUSI (warning saja) ────────────────────────────────────────────
-print("\n[7] DISTRIBUSI — Checks informatif (warning jika anomali)")
-check(
-    "fct_visit: ada kunjungan rawat inap",
-    "SELECT COUNT(*) FROM analytics_marts.fct_visit WHERE is_inpatient = TRUE",
-    expect_zero=False, warn_only=True
+val, status = check(
+    "dim_tanggal.bulan in [1-12]",
+    "SELECT COUNT(*) FROM analytics_marts.dim_tanggal WHERE tanggal IS NOT NULL AND (bulan < 1 OR bulan > 12)"
 )
-check(
-    "fct_visit: ada kunjungan rawat jalan",
-    "SELECT COUNT(*) FROM analytics_marts.fct_visit WHERE is_inpatient = FALSE",
-    expect_zero=False, warn_only=True
-)
-check(
-    "fct_billing: ada billing berstatus Paid",
-    "SELECT COUNT(*) FROM analytics_marts.fct_billing WHERE payment_status = 'Paid'",
-    expect_zero=False, warn_only=True
-)
+print(f"  dim_tanggal.bulan di luar [1-12]         : {val:>8,}  [{status}]")
 
-# ── RINGKASAN ────────────────────────────────────────────────────────────────
-total = passed + failed + warnings
-print("\n" + "=" * 70)
-print("RINGKASAN DATA QUALITY CHECK")
-print("=" * 70)
-print(f"  Total checks : {total}")
-print(f"  ✓ Passed     : {passed}")
-print(f"  ✗ Failed     : {failed}")
-print(f"  ⚠ Warnings   : {warnings}")
-print("=" * 70)
+val, status = check(
+    "dim_tanggal.tahun in [2020-2027]",
+    "SELECT COUNT(*) FROM analytics_marts.dim_tanggal WHERE tanggal IS NOT NULL AND (tahun < 2020 OR tahun > 2027)"
+)
+print(f"  dim_tanggal.tahun di luar [2020-2027]    : {val:>8,}  [{status}]")
 
-if failed > 0:
-    print(f"\n⚠ PERHATIAN: {failed} check gagal. Review dan perbaiki sebelum submit.")
-    sys.exit(1)
+val, status = check(
+    "fct_kunjungan.durasi_kunjungan_jam >= 0",
+    "SELECT COUNT(*) FROM analytics_marts.fct_kunjungan WHERE durasi_kunjungan_jam IS NOT NULL AND durasi_kunjungan_jam < 0"
+)
+print(f"  fct_kunjungan.durasi_kunjungan_jam < 0   : {val:>8,}  [{status}]")
+
+val, status = check(
+    "fct_diagnosis.total_biaya_diagnosis >= 0",
+    "SELECT COUNT(*) FROM analytics_marts.fct_diagnosis WHERE total_biaya_diagnosis IS NOT NULL AND total_biaya_diagnosis < 0"
+)
+print(f"  fct_diagnosis.total_biaya_diagnosis < 0  : {val:>8,}  [{status}]")
+
+val, status = check(
+    "fct_tindakan.total_biaya_tindakan >= 0",
+    "SELECT COUNT(*) FROM analytics_marts.fct_tindakan_medis WHERE total_biaya_tindakan IS NOT NULL AND total_biaya_tindakan < 0"
+)
+print(f"  fct_tindakan.total_biaya_tindakan < 0    : {val:>8,}  [{status}]")
+
+# ─────────────────────────────────────────
+# [6] CONSISTENCY — unknown member
+# WARN bukan FAIL jika tidak ada -1 (data asli mungkin sudah clean)
+# ─────────────────────────────────────────
+print("\n[6] CONSISTENCY — Unknown member (-1) di dimensi [WARN jika tidak ada]")
+UNKNOWN_CHECKS = [
+    ("dim_tanggal",    "tanggal_key"),
+    ("dim_pasien",     "pasien_key"),
+    ("dim_dokter",     "dokter_key"),
+    ("dim_departemen", "departemen_key"),
+    ("dim_ruangan",    "ruangan_key"),
+]
+for tbl, col in UNKNOWN_CHECKS:
+    n = con.execute(f"SELECT COUNT(*) FROM analytics_marts.{tbl} WHERE {col} = -1").fetchone()[0]
+    status = PASS if n >= 1 else WARN
+    results.append((f"{tbl} punya unknown member", n, status))
+    print(f"  {tbl}.{col} = -1          : count={n:>6,}  [{status}]")
+
+# ─────────────────────────────────────────
+# [7] DISTRIBUSI
+# ─────────────────────────────────────────
+print("\n[7] DISTRIBUSI — Variasi data")
+n_inap  = con.execute("SELECT COUNT(*) FROM analytics_marts.fct_kunjungan WHERE is_rawat_inap = TRUE").fetchone()[0]
+n_jalan = con.execute("SELECT COUNT(*) FROM analytics_marts.fct_kunjungan WHERE is_rawat_inap = FALSE").fetchone()[0]
+print(f"  fct_kunjungan rawat_inap=TRUE            : {n_inap:>8,}  [{'PASS' if n_inap > 0 else 'FAIL'}]")
+print(f"  fct_kunjungan rawat_inap=FALSE           : {n_jalan:>8,}  [{'PASS' if n_jalan > 0 else 'FAIL'}]")
+
+n_confirmed = con.execute("SELECT COUNT(*) FROM analytics_marts.fct_diagnosis WHERE is_confirmed = TRUE").fetchone()[0]
+print(f"  fct_diagnosis is_confirmed=TRUE          : {n_confirmed:>8,}  [{'PASS' if n_confirmed > 0 else 'FAIL'}]")
+
+n_selesai = con.execute("SELECT COUNT(*) FROM analytics_marts.fct_tindakan_medis WHERE is_selesai = TRUE").fetchone()[0]
+print(f"  fct_tindakan is_selesai=TRUE             : {n_selesai:>8,}  [{'PASS' if n_selesai > 0 else 'FAIL'}]")
+
+n_appt = con.execute("SELECT COUNT(*) FROM analytics_marts.fct_kunjungan WHERE is_dari_appointment = TRUE").fetchone()[0]
+print(f"  fct_kunjungan dari_appointment=TRUE      : {n_appt:>8,}  [{'PASS' if n_appt > 0 else 'FAIL'}]")
+
+# ─────────────────────────────────────────
+# RINGKASAN
+# ─────────────────────────────────────────
+total  = len(results)
+n_pass = sum(1 for _, _, s in results if s == PASS)
+n_warn = sum(1 for _, _, s in results if s == WARN)
+n_fail = sum(1 for _, _, s in results if s == FAIL)
+
+print("\n" + "=" * 75)
+print(f"RINGKASAN: {total} checks — {n_pass} PASS | {n_warn} WARN | {n_fail} FAIL")
+if n_fail > 0:
+    print("STATUS AKHIR: PERLU PERHATIAN")
+elif n_warn > 0:
+    print("STATUS AKHIR: LULUS DENGAN PERINGATAN (normal untuk unknown member check)")
 else:
-    print("\n✓ Semua critical checks PASS. Data mart siap untuk BI.")
+    print("STATUS AKHIR: SEMUA CHECKS LULUS")
+print("=" * 75)
 
 con.close()

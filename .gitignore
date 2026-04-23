@@ -52,3 +52,9 @@ docs/generated/
 #archivedata
 data/archive/
 archive.zip
+
+# Backup files
+*.bak
+
+# Dummy data generator (removed — using real Kaggle dataset)
+generate_dummy_data.py
