@@ -192,7 +192,7 @@ task_dbt_intermediate = BashOperator(
 
 task_dbt_marts = BashOperator(
     task_id='dbt_run_marts',
-    bash_command=f'cd {DBT_DIR} && {DBT_BIN} run --select marts --profiles-dir . 2>&1',
+    bash_command=f'cd {DBT_DIR} && {DBT_BIN} run --select marts --threads 1 --profiles-dir . 2>&1',
     dag=dag,
 )
 
