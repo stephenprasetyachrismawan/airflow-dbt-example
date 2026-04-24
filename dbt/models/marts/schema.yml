@@ -240,9 +240,8 @@ models:
           - unique
           - not_null
       - name: rom_id
-        description: "Natural key — ID ruangan dari sistem sumber"
+        description: "Natural key — ID ruangan dari sistem sumber (tidak unique di SCD1; uniqueness dijamin oleh ruangan_key)"
         tests:
-          - unique
           - not_null
       - name: departemen_id
         description: "ID departemen pemilik ruangan (FK logis ke dim_departemen.dep_id)"
@@ -330,9 +329,8 @@ models:
               to: ref('dim_tanggal')
               field: tanggal_key
       - name: refr_no
-        description: "Degenerate dimension — nomor referensi kunjungan dari sistem sumber"
+        description: "Degenerate dimension — nomor referensi kunjungan dari sistem sumber (tidak unique; satu refr_no bisa terkait >1 kunjungan)"
         tests:
-          - unique
           - not_null
       - name: medt_id
         description: "Degenerate dimension — ID tim medis yang menangani"
